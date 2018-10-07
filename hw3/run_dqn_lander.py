@@ -86,7 +86,7 @@ def get_session():
     tf_config = tf.ConfigProto(
         inter_op_parallelism_threads=1,
         intra_op_parallelism_threads=1,
-        device_count={'GPU': 0})
+        device_count={'GPU': 1})
     # GPUs don't significantly speed up deep Q-learning for lunar lander,
     # since the observations are low-dimensional
     session = tf.Session(config=tf_config)
