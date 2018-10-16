@@ -6,6 +6,7 @@ import random
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
+import argparse
 
 import dqn
 from dqn_utils import *
@@ -46,7 +47,6 @@ def lander_kwargs():
     return {
         'optimizer_spec': lander_optimizer(),
         'q_func': lander_model,
-        'replay_buffer_size': 50000,
         'batch_size': 32,
         'gamma': 1.00,
         'learning_starts': 1000,
@@ -60,7 +60,9 @@ def lander_kwargs():
 def lander_learn(env,
                  session,
                  num_timesteps,
-                 seed):
+                 seed,
+                 file_name,
+                 replay_buffer_size):
 
     optimizer = lander_optimizer()
     stopping_criterion = lander_stopping_criterion(num_timesteps)
@@ -72,6 +74,8 @@ def lander_learn(env,
         exploration=lander_exploration_schedule(num_timesteps),
         stopping_criterion=lander_stopping_criterion(num_timesteps),
         double_q=True,
+        rew_file=file_name,
+        replay_buffer_size=replay_buffer_size,
         **lander_kwargs()
     )
     env.close()
@@ -104,13 +108,20 @@ def get_env(seed):
     return env
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file_name", type=str, default=None)
+    parser.add_argument("-b", "--buffer_size", type=int, default=50000)
+    args = parser.parse_args()
+
     # Run training
     seed = 4565 # you may want to randomize this
     print('random seed = %d' % seed)
     env = get_env(seed)
     session = get_session()
     set_global_seeds(seed)
-    lander_learn(env, session, num_timesteps=500000, seed=seed)
+    lander_learn(env, session, num_timesteps=500000, seed=seed,
+                 file_name=args.file_name,
+                 replay_buffer_size=args.buffer_size)
 
 if __name__ == "__main__":
     main()

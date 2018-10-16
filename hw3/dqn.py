@@ -11,6 +11,7 @@ import tensorflow.contrib.layers as layers
 from collections import namedtuple
 from dqn_utils import *
 
+
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
 
 class QLearner(object):
@@ -23,7 +24,7 @@ class QLearner(object):
     session,
     exploration=LinearSchedule(1000000, 0.1),
     stopping_criterion=None,
-    replay_buffer_size=1000000//20,
+    replay_buffer_size=1000000,
     batch_size=32,
     gamma=0.99,
     learning_starts=50000,
@@ -365,7 +366,7 @@ class QLearner(object):
 
       sys.stdout.flush()
 
-      with open(self.rew_file, 'wb') as f:
+      with open(self.rew_file, 'ab') as f:
         pickle.dump(
           {"mean_reward": self.mean_episode_reward,
            "best_mean_reward": self.best_mean_episode_reward,
