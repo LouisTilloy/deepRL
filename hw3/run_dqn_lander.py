@@ -113,6 +113,7 @@ def main():
     parser.add_argument("-b", "--buffer_size", type=int, default=50000)
     args = parser.parse_args()
 
+    import ipdb;ipdb.set_trace()
     # Run training
     seed = 4565 # you may want to randomize this
     print('random seed = %d' % seed)

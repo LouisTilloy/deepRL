@@ -123,6 +123,7 @@ def main():
     seed = random.randint(0, 9999)
     print('random seed = %d' % seed)
     env = get_env(task, seed)
+    import ipdb;ipdb.set_trace()
     session = get_session()
     atari_learn(env, session, num_timesteps=2e8)
 

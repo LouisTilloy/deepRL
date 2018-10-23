@@ -31,13 +31,13 @@ class TimeIt(object):
                 s += '{0}: {1: <10} {2:.1f}\n'.format(self.prefix, name, elapsed)
             else:
                 assert(self.elapsed_times['total'] >= max(self.elapsed_times.values()))
-                pct = 100. * elapsed / self.elapsed_times['total']
+                pct = 100. * elapsed / (self.elapsed_times['total'] + 1e-4)
                 s += '{0}: {1: <10} {2:.1f} ({3:.1f}%)\n'.format(self.prefix, name, elapsed, pct)
         if 'total' in self.elapsed_times:
             times_summed = sum([t for k, t in self.elapsed_times.items() if k != 'total'])
             other_time = self.elapsed_times['total'] - times_summed
             assert(other_time >= 0)
-            pct = 100. * other_time / self.elapsed_times['total']
+            pct = 100. * other_time / (self.elapsed_times['total'] + 1e-4)
             s += '{0}: {1: <10} {2:.1f} ({3:.1f}%)\n'.format(self.prefix, 'other', other_time, pct)
         return s
 
