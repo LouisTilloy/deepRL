@@ -1,27 +1,14 @@
-#!/usr/bin/env bash
+python main.py q1
 
-##########
-### Q1 ###
-##########
 
-python main.py q1 --exp_name exp
 
-##########
-### Q2 ###
-##########
+python main.py q2
 
-python main.py q2 --exp_name exp
 
-###########
-### Q3a ###
-###########
 
 python main.py q3 --exp_name default
 python plot.py --exps HalfCheetah_q3_default --save HalfCheetah_q3_default
 
-###########
-### Q3b ###
-###########
 
 python main.py q3 --exp_name action128 --num_random_action_selection 128
 python main.py q3 --exp_name action4096 --num_random_action_selection 4096

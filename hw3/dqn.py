@@ -113,6 +113,8 @@ class QLearner(object):
         img_h, img_w, img_c = self.env.observation_space.shape
         input_shape = (img_h, img_w, frame_history_len * img_c)
     self.num_actions = self.env.action_space.n
+    import ipdb;
+    ipdb.set_trace()
 
     # set up placeholders
     # placeholder for current observation (or state)
@@ -382,4 +384,3 @@ def learn(*args, **kwargs):
     # observation
     alg.update_model()
     alg.log_progress()
-
