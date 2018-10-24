@@ -206,3 +206,4 @@ class ModelBasedRL(object):
             dataset.append(new_rollouts_dataset)
 
             self._log(new_rollouts_dataset)
+
