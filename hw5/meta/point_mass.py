@@ -3,17 +3,26 @@ from gym import spaces
 from gym import Env
 
 
+def random_odd(max_index):
+    return np.random.randint(0, max_index // 2 + max_index % 2) * 2 + 1
+
+def random_even(max_index):
+    return np.random.randint(0, max_index // 2 + 1) * 2
+
+
 class PointEnv(Env):
     """
     point mass on a 2-D plane
     goals are sampled randomly from a square
     """
 
-    def __init__(self, num_tasks=1):
+    def __init__(self, num_tasks=1, granularity=None):
+        self.granularity = granularity
         self.reset_task()
         self.reset()
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,))
         self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,))
+
 
     def reset_task(self, is_evaluation=False):
         '''
@@ -27,12 +36,30 @@ class PointEnv(Env):
         #                           ----------PROBLEM 3----------
         #====================================================================================#
         # YOUR CODE HERE
-        x = np.random.uniform(-10, 10)
-        y = np.random.uniform(-10, 10)
-        self._goal = np.array([x, y])
+        if self.granularity is not None:
+            side_size = self.granularity
+            index_max = 20 // side_size - 1
 
-    def get_all_task_idx(self):
-        return [0]
+            i = np.random.randint(0, index_max + 1)
+            if is_evaluation:
+                if i % 2 == 0:
+                    j = random_odd(index_max)
+                else:
+                    j = random_even(index_max)
+            else:
+                if i % 2 == 0:
+                    j = random_even(index_max)
+                else:
+                    j = random_odd(index_max)
+
+            x = np.random.uniform(-10 + j * side_size, -10 + (j + 1) * side_size)
+            y = np.random.uniform(-10 + i * side_size, -10 + (i + 1) * side_size)
+            self._goal = np.array([x, y])
+
+        else:
+            x = np.random.uniform(-10, 10)
+            y = np.random.uniform(-10, 10)
+            self._goal = np.array([x, y])
 
     def reset(self):
         self._state = np.array([0, 0], dtype=np.float32)

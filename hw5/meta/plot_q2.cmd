@@ -1,0 +1,1 @@
+python .\plot.py data/q2_h1_nor_pm_10-11-2018_16-09-35 data/q2_h10_nor_pm_10-11-2018_16-15-23 data/q2_h60_nor_pm_10-11-2018_16-21-19 data/q2_h1_r_pm_10-11-2018_16-41-43 data/q2_h10_r_pm_10-11-2018_16-49-44 data/q2_h60_r_pm_10-11-2018_17-06-49 data/q2_h120_r_pm_11-11-2018_11-43-45 --legend h1_nor h10_nor h60_nor h1_r h10_r h60_r h120_r

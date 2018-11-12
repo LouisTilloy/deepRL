@@ -1,0 +1,5 @@
+python .\plot.py data/q3_h1_r_g0_1_pm_10-11-2018_22-09-32 data/q3_h1_r_g1_0_pm_10-11-2018_22-15-14 data/q3_h1_r_g5_0_pm_10-11-2018_22-21-41 data/q3_h1_r_g10_0_pm_11-11-2018_13-32-32 data/q3_h60_r_g0_1_pm_10-11-2018_18-10-51 data/q3_h60_r_g1_0_pm_10-11-2018_19-40-12 data/q3_h60_r_g5_0_pm_10-11-2018_20-54-02 data/q3_h60_r_g10_0_pm_11-11-2018_14-01-04 --legend h1_r_g0_1 h1_r_g1_0 h1_r_g5_0 h1_r_g10_0 h60_r_g0_1 h60_r_g1_0 h60_r_g5_0 h60_r_g10_0 --value AverageReturn ValAverageReturn
+
+python .\plot.py data/q3_h60_r_g0_1_pm_10-11-2018_18-10-51 data/q3_h60_r_g1_0_pm_10-11-2018_19-40-12 data/q3_h60_r_g5_0_pm_10-11-2018_20-54-02 data/q3_h60_r_g10_0_pm_11-11-2018_14-01-04 --legend h60_r_g0_1 h60_r_g1_0 h60_r_g5_0 h60_r_g10_0 --value AverageReturn ValAverageReturn
+
+python .\plot.py data/q3_h1_r_g0_1_pm_10-11-2018_22-09-32 data/q3_h1_r_g1_0_pm_10-11-2018_22-15-14 data/q3_h1_r_g5_0_pm_10-11-2018_22-21-41 data/q3_h1_r_g10_0_pm_11-11-2018_13-32-32 --legend h1_r_g0_1 h1_r_g1_0 h1_r_g5_0 h1_r_g10_0 --value AverageReturn ValAverageReturn

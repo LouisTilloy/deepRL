@@ -16,6 +16,7 @@ import scipy.signal
 import os
 import time
 import inspect
+import copy
 from multiprocessing import Process
 
 from replay_buffer import ReplayBuffer, PPOReplayBuffer
@@ -52,15 +53,24 @@ def build_mlp(x, output_size, scope, n_layers, size, activation=tf.tanh, output_
     """
     i = 0
     for i in range(n_layers):
-        x = tf.layers.dense(inputs=x,units=size, activation=activation, name='fc{}'.format(i), kernel_regularizer=regularizer, bias_regularizer=regularizer)
+        x = tf.layers.dense(inputs=x,units=size, activation=activation,
+                            name='fc{}'.format(i), kernel_regularizer=regularizer,
+                            bias_regularizer=regularizer)
 
-    x = tf.layers.dense(inputs=x, units=output_size, activation=output_activation, name='fc{}'.format(i + 1), kernel_regularizer=regularizer, bias_regularizer=regularizer)
+    x = tf.layers.dense(inputs=x, units=output_size, activation=output_activation,
+                        name='fc{}'.format(i + 1), kernel_regularizer=regularizer,
+                        bias_regularizer=regularizer)
     return x
 
-def build_rnn(x, h, output_size, scope, n_layers, size, gru_size, activation=tf.tanh, output_activation=None, regularizer=None):
+def build_rnn(x, h, output_size, scope, n_layers, size, activation=tf.tanh,
+              output_activation=None, regularizer=None):
     """
     builds a gated recurrent neural network
     inputs are first embedded by an MLP then passed to a GRU cell
+
+    make MLP layers with `size` number of units
+    make the GRU with `output_size` number of units
+    use `activation` as the activation function for both MLP and GRU
 
     arguments:
         (see `build_policy()`)
@@ -71,6 +81,19 @@ def build_rnn(x, h, output_size, scope, n_layers, size, gru_size, activation=tf.
     #                           ----------PROBLEM 2----------
     #====================================================================================#
     # YOUR CODE HERE
+    mlp_output = build_mlp(x, output_size, scope, n_layers, size, activation=activation,
+                           output_activation=output_activation, regularizer=regularizer)
+    gru_cell = tf.nn.rnn_cell.GRUCell(output_size, activation=activation, reuse=None)
+
+    history = x.shape[1]
+    cell_outputs = []
+    for i in range(history):
+        cell_output, h = gru_cell(mlp_output[:, i, :], h, scope=scope)
+        cell_outputs.append(cell_output)
+    cell_outputs = tf.transpose(tf.stack(cell_outputs), perm=[1, 0, 2])
+
+    return cell_output, h
+
 
 def build_policy(x, h, output_size, scope, n_layers, size, gru_size, recurrent=True, activation=tf.tanh, output_activation=None):
     """
@@ -96,11 +119,15 @@ def build_policy(x, h, output_size, scope, n_layers, size, gru_size, recurrent=T
     """
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         if recurrent:
-            x, h = build_rnn(x, h, gru_size, scope, n_layers, size, gru_size, activation=activation, output_activation=output_activation)
+            x, h = build_rnn(x, h, gru_size, scope, n_layers, size,
+                             activation=activation, output_activation=activation)
         else:
             x = tf.reshape(x, (-1, x.get_shape()[1]*x.get_shape()[2]))
-            x = build_mlp(x, gru_size, scope, n_layers + 1, size, activation=activation, output_activation=activation)
-        x = tf.layers.dense(x, output_size, activation=output_activation, kernel_initializer=tf.initializers.truncated_normal(mean=0.0, stddev=0.01), bias_initializer=tf.zeros_initializer(), name='decoder')
+            x = build_mlp(x, gru_size, scope, n_layers + 1, size,
+                          activation=activation, output_activation=activation)
+        x = tf.layers.dense(x, output_size, activation=output_activation,
+                            kernel_initializer=tf.initializers.truncated_normal(mean=0.0, stddev=0.01),
+                            bias_initializer=tf.zeros_initializer(), name='decoder')
     return x, h
 
 def build_critic(x, h, output_size, scope, n_layers, size, gru_size, recurrent=True, activation=tf.tanh, output_activation=None, regularizer=None):
@@ -115,11 +142,14 @@ def build_critic(x, h, output_size, scope, n_layers, size, gru_size, recurrent=T
     """
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         if recurrent:
-            x, h = build_rnn(x, h, gru_size, scope, n_layers, size, gru_size, activation=activation, output_activation=output_activation, regularizer=regularizer)
+            x, h = build_rnn(x, h, gru_size, scope, n_layers, size, activation=activation,
+                             output_activation=output_activation, regularizer=regularizer)
         else:
             x = tf.reshape(x, (-1, x.get_shape()[1]*x.get_shape()[2]))
-            x = build_mlp(x, gru_size, scope, n_layers + 1, size, activation=activation, output_activation=activation, regularizer=regularizer)
-        x = tf.layers.dense(x, output_size, activation=output_activation, name='decoder', kernel_regularizer=regularizer, bias_regularizer=regularizer)
+            x = build_mlp(x, gru_size, scope, n_layers + 1, size, activation=activation,
+                          output_activation=activation, regularizer=regularizer)
+        x = tf.layers.dense(x, output_size, activation=output_activation, name='decoder',
+                            kernel_regularizer=regularizer, bias_regularizer=regularizer)
     return x
 
 def pathlength(path):
@@ -195,10 +225,12 @@ class Agent(object):
             sy_lp_n: placeholder for pre-computed log-probs
             sy_fixed_lp_n: placeholder for pre-computed old log-probs
         """
-        sy_ob_no = tf.placeholder(shape=[None, self.history, self.meta_ob_dim], name="ob", dtype=tf.float32)
+        sy_ob_no = tf.placeholder(shape=[None, self.history, self.meta_ob_dim], name="ob",
+                                  dtype=tf.float32)
         sy_ac_na = tf.placeholder(shape=[None, self.ac_dim], name="ac", dtype=tf.float32)
         sy_adv_n = tf.placeholder(shape=[None], name="adv", dtype=tf.float32)
-        sy_hidden = tf.placeholder(shape=[None, self.gru_size], name="hidden", dtype=tf.float32)
+        sy_hidden = tf.placeholder(shape=[None, self.gru_size], name="hidden",
+                                   dtype=tf.float32)
 
         sy_lp_n = tf.placeholder(shape=[None], name="logprob", dtype=tf.float32)
         sy_fixed_lp_n = tf.placeholder(shape=[None], name="fixed_logprob", dtype=tf.float32)
@@ -224,7 +256,10 @@ class Agent(object):
 
         """
         # ac_dim * 2 because we predict both mean and std
-        sy_policy_params, sy_hidden = build_policy(sy_ob_no, sy_hidden, self.ac_dim*2, self.scope, n_layers=self.n_layers, size=self.size, gru_size=self.gru_size, recurrent=self.recurrent)
+        sy_policy_params, sy_hidden = build_policy(sy_ob_no, sy_hidden, self.ac_dim*2,
+                                                   self.scope, n_layers=self.n_layers,
+                                                   size=self.size, gru_size=self.gru_size,
+                                                   recurrent=self.recurrent)
         return (sy_policy_params, sy_hidden)
 
     def sample_action(self, policy_parameters):
@@ -243,7 +278,8 @@ class Agent(object):
                 (batch_size, self.ac_dim)
         """
         sy_mean, sy_logstd = policy_parameters
-        sy_sampled_ac = sy_mean + tf.exp(sy_logstd) * tf.random_normal(tf.shape(sy_mean), 0, 1)
+        sy_sampled_ac = sy_mean +\
+                        tf.exp(sy_logstd) * tf.random_normal(tf.shape(sy_mean), 0, 1)
         return sy_sampled_ac
 
     def get_log_prob(self, policy_parameters, sy_ac_na):
@@ -308,18 +344,29 @@ class Agent(object):
 
         # PPO critic update
         critic_regularizer = tf.contrib.layers.l2_regularizer(1e-3) if self.l2reg else None
-        self.critic_prediction = tf.squeeze(build_critic(self.sy_ob_no, self.sy_hidden, 1, 'critic_network', n_layers=self.n_layers, size=self.size, gru_size=self.gru_size, regularizer=critic_regularizer))
-        self.sy_target_n = tf.placeholder(shape=[None], name="critic_target", dtype=tf.float32)
-        self.critic_loss = tf.losses.mean_squared_error(self.sy_target_n, self.critic_prediction)
-        self.critic_weights = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='critic_network')
-        self.critic_update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.critic_loss)
+        self.critic_prediction = tf.squeeze(build_critic(self.sy_ob_no, self.sy_hidden, 1, 'critic_network',
+                                                         n_layers=self.n_layers, size=self.size,
+                                                         gru_size=self.gru_size, recurrent=self.recurrent,
+                                                         regularizer=critic_regularizer))
+        self.sy_target_n = tf.placeholder(shape=[None], name="critic_target",
+                                          dtype=tf.float32)
+        self.critic_loss = tf.losses.mean_squared_error(self.sy_target_n,
+                                                        self.critic_prediction)
+        self.critic_weights = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                                scope='critic_network')
+        self.critic_update_op = tf.train.AdamOptimizer(self.learning_rate)\
+            .minimize(self.critic_loss)
 
         # PPO actor update
-        self.sy_fixed_log_prob_n = tf.placeholder(shape=[None], name="fixed_log_prob", dtype=tf.float32)
-        self.policy_surr_loss = self.ppo_loss(self.sy_lp_n, self.sy_fixed_lp_n, self.sy_adv_n)
-        self.policy_weights = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.scope)
+        self.sy_fixed_log_prob_n = tf.placeholder(shape=[None], name="fixed_log_prob",
+                                                  dtype=tf.float32)
+        self.policy_surr_loss = self.ppo_loss(self.sy_lp_n, self.sy_fixed_lp_n,
+                                              self.sy_adv_n)
+        self.policy_weights = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                                scope=self.scope)
         optimizer = tf.train.AdamOptimizer(self.learning_rate)
-        self.policy_update_op = minimize_and_clip(optimizer, self.policy_surr_loss, var_list=self.policy_weights, clip_val=40)
+        self.policy_update_op = minimize_and_clip(optimizer, self.policy_surr_loss,
+                                                  var_list=self.policy_weights, clip_val=40)
 
     def sample_trajectories(self, itr, env, min_timesteps, is_evaluation=False):
         # Collect paths until we have enough timesteps
@@ -327,7 +374,8 @@ class Agent(object):
         stats = []
         while True:
             animate_this_episode=(len(stats)==0 and (itr % 10 == 0) and self.animate)
-            steps, s = self.sample_trajectory(env, animate_this_episode, is_evaluation=is_evaluation)
+            steps, s = self.sample_trajectory(env, animate_this_episode,
+                                              is_evaluation=is_evaluation)
             stats += s
             timesteps_this_batch += steps
             if timesteps_this_batch > min_timesteps:
@@ -373,25 +421,46 @@ class Agent(object):
                 # first meta ob has only the observation
                 # set a, r, d to zero, construct first meta observation in meta_obs
                 # YOUR CODE HERE
+                a = np.zeros((self.ac_dim,))
+                r = np.zeros((self.reward_dim,))
+                rewards.append(0)
+                d = np.zeros((self.terminal_dim,))
+
+                meta_ob = np.concatenate((ob, a, r, d))
+                meta_obs[steps+self.history] = meta_ob
 
                 steps += 1
 
             # index into the meta_obs array to get the window that ends with the current timestep
+            # please name the windowed observation `in_` for compatibilty with the code that adds to the replay buffer (lines 418, 420)
             # YOUR CODE HERE
+            #import ipdb;ipdb.set_trace()
+            in_ = meta_obs[steps:steps + self.history]
 
             hidden = np.zeros((1, self.gru_size), dtype=np.float32)
 
             # get action from the policy
             # YOUR CODE HERE
+            ac = self.sess.run(self.sy_sampled_ac,
+                               feed_dict={
+                                   self.sy_ob_no: [in_],
+                                   self.sy_hidden: hidden
+                               })[0]
 
             # step the environment
             # YOUR CODE HERE
+            ob, rew, done, _ = env.step(ac)
 
             ep_steps += 1
 
             done = bool(done) or ep_steps == self.max_path_length
             # construct the meta-observation and add it to meta_obs
             # YOUR CODE HERE
+            meta_ob = np.concatenate((ob, ac, [rew], [done]))
+            meta_obs[steps+self.history] = meta_ob
+
+            if np.isnan(meta_obs).any():
+                import ipdb;ipdb.set_trace()
 
             rewards.append(rew)
             steps += 1
@@ -406,7 +475,7 @@ class Agent(object):
             if done:
                 # compute stats over trajectory
                 s = dict()
-                s['rewards']= rewards[-ep_steps:]
+                s['rewards'] = rewards[-ep_steps:]
                 s['ep_len'] = ep_steps
                 stats.append(s)
                 ep_steps = 0
@@ -438,7 +507,9 @@ class Agent(object):
         bsize = len(re_n)
         rewards = np.squeeze(re_n)
         masks = np.squeeze(masks)
-        values = self.sess.run(self.critic_prediction, feed_dict={self.sy_ob_no: ob_no, self.sy_hidden: hidden})[:,None]
+        values = \
+            self.sess.run(self.critic_prediction,
+                          feed_dict={self.sy_ob_no: ob_no, self.sy_hidden: hidden})[:,None]
         gamma = self.gamma
 
         assert rewards.shape == masks.shape == (bsize,)
@@ -527,7 +598,8 @@ class Agent(object):
         for k in range(self.num_value_iters):
             critic_loss, _ = self.sess.run(
                 [self.critic_loss, self.critic_update_op],
-                feed_dict={self.sy_target_n: target_n, self.sy_ob_no: ob_no, self.sy_hidden: hidden})
+                feed_dict={self.sy_target_n: target_n, self.sy_ob_no: ob_no,
+                           self.sy_hidden: hidden})
         return critic_loss
 
     def update_policy(self, ob_no, hidden, ac_na, fixed_log_probs, advantages):
@@ -539,7 +611,8 @@ class Agent(object):
         '''
         policy_surr_loss, _ = self.sess.run(
             [self.policy_surr_loss, self.policy_update_op],
-            feed_dict={self.sy_ob_no: ob_no, self.sy_hidden: hidden, self.sy_ac_na: ac_na, self.sy_fixed_lp_n: fixed_log_probs, self.sy_adv_n: advantages})
+            feed_dict={self.sy_ob_no: ob_no, self.sy_hidden: hidden, self.sy_ac_na: ac_na,
+                       self.sy_fixed_lp_n: fixed_log_probs, self.sy_adv_n: advantages})
         return policy_surr_loss
 
     def ppo_loss(self, log_probs, fixed_log_probs, advantages, clip_epsilon=0.1, entropy_coeff=1e-4):
@@ -594,6 +667,7 @@ def train_PG(
         num_tasks,
         l2reg,
         recurrent,
+        granularity
         ):
 
     start = time.time()
@@ -611,7 +685,7 @@ def train_PG(
     envs = {'pm': PointEnv,
             'pm-obs': ObservedPointEnv,
             }
-    env = envs[env_name](num_tasks)
+    env = envs[env_name](num_tasks, granularity)
 
     # Set random seeds
     tf.set_random_seed(seed)
@@ -689,8 +763,11 @@ def train_PG(
 
         # sample trajectories to fill agent's replay buffer
         print("********** Iteration %i ************"%itr)
-        stats, timesteps_this_batch = agent.sample_trajectories(itr, env, min_timesteps_per_batch)
-        total_timesteps += timesteps_this_batch
+        stats = []
+        for _ in range(num_tasks):
+            s, timesteps_this_batch = agent.sample_trajectories(itr, env, min_timesteps_per_batch)
+            total_timesteps += timesteps_this_batch
+            stats += s
 
         # compute the log probs, advantages, and returns for all data in agent's buffer
         # store in ppo buffer for use in multiple ppo updates
@@ -715,13 +792,16 @@ def train_PG(
 
             log_probs = agent.sess.run(agent.sy_lp_n,
                 feed_dict={agent.sy_ob_no: ob_no, agent.sy_hidden: hidden, agent.sy_ac_na: ac_na})
-            print('new log prob', log_probs.shape)
+            #print('new log prob', log_probs.shape)
 
             agent.update_parameters(ob_no, hidden, ac_na, fixed_log_probs, q_n, adv_n)
 
         # compute validation statistics
         print('Validating...')
-        val_stats, timesteps_this_batch = agent.sample_trajectories(itr, env, min_timesteps_per_batch // 10, is_evaluation=True)
+        val_stats = []
+        for _ in range(num_tasks):
+            vs, timesteps_this_batch = agent.sample_trajectories(itr, env, min_timesteps_per_batch // 10, is_evaluation=True)
+            val_stats += vs
 
         # save trajectories for viz
         with open("output/{}-epoch{}.pkl".format(exp_name, itr), 'wb') as f:
@@ -778,6 +858,7 @@ def main():
     parser.add_argument('--history', '-ho', type=int, default=1)
     parser.add_argument('--l2reg', '-reg', action='store_true')
     parser.add_argument('--recurrent', '-rec', action='store_true')
+    parser.add_argument('--granularity', '-g', type=float, default=None)
     args = parser.parse_args()
 
     if not(os.path.exists('data')):
@@ -819,18 +900,20 @@ def main():
                 num_tasks=args.num_tasks,
                 l2reg=args.l2reg,
                 recurrent=args.recurrent,
+                granularity=args.granularity
                 )
         # # Awkward hacky process runs, because Tensorflow does not like
         # # repeatedly calling train_PG in the same thread.
-        p = Process(target=train_func, args=tuple())
-        p.start()
-        processes.append(p)
+        #p = Process(target=train_func, args=tuple())
+        #p.start()
+        #processes.append(p)
         # if you comment in the line below, then the loop will block
         # until this process finishes
         # p.join()
+        train_func()
 
-    for p in processes:
-        p.join()
+    #for p in processes:
+    #    p.join()
 
 
 if __name__ == "__main__":
